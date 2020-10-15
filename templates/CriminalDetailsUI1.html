@@ -1,0 +1,536 @@
+<html>
+
+<head>
+    <title>Criminal Details</title>
+    <script src="../static/angular.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_APIKEY"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+</head>
+
+<body class="main">
+    <div ng-app="CriminalDet" ng-controller="CriminalDetController">
+        <div id="map"></div>
+        <div class="actual_rings"></div>
+        <div class="slideshowContainer">
+            <img class="imageSlides" id="crimimg1">
+            <img class="imageSlides" id="crimimg2">
+            <img class="imageSlides" id="crimimg3">
+
+            <!-- I would recommend to replace these 'span' elements with 'img' files
+                for each the left and right arrow that fits your project, and size accordingly.
+                I've shown 'span' elements because I didn't want to upload files. -->
+            <span id="leftArrow" class="slideshowArrow">&#8249;</span>
+            <span id="rightArrow" class="slideshowArrow">&#8250;</span>
+
+            <div class="slideshowCircles">
+                <span class="circle dot"></span>
+                <span class="circle"></span>
+                <span class="circle"></span>
+            </div>
+
+        </div>
+        <!-- <img id="crimimg"> -->
+        <lable id="crimid"></lable>
+        <lable id="crimname"></lable>
+        <lable id="crimadd"></lable>
+        <lable id="crimage"></lable>
+        <lable id="crimph"></lable>
+
+        <table id="crimedet">
+            {% raw %}
+            <tr ng-repeat="crime in criminaldet1">
+                <td style="width:33%;">{{crime.crime}}</td>
+                <td style="width:35%;">{{crime.place}}</td>
+                <td style="width:15%;">{{crime.date}}</td>
+                <td style="width:20%;">{{crime.time}}</td>
+            </tr>
+            {% endraw %}
+        </table>
+        <input id="mapsbtn" type="button" value="Locations" onclick="openmaps()">
+    </div>
+</body>
+
+<script>
+    var CriminalDet = angular.module("CriminalDet", []);
+    CriminalDet.controller("CriminalDetController", function($scope, $timeout, $rootScope, $window, $http) {
+        function getCriminalsList() {
+            $http({
+                url: '/getCriminalsDetails',
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            }).then(function(data) {
+                $scope.criminaldet = data.data.result;
+                $scope.criminaldet1 = $scope.criminaldet[0].cdetails;
+                // document.getElementById("crimimg").src = "../static/CriminalImages/" + $scope.criminaldet[0].cid + ".jpg";
+                document.getElementById("crimimg1").src = "../static/CriminalImages/" + $scope.criminaldet[0].cid + "1.jpg";
+                document.getElementById("crimimg2").src = "../static/CriminalImages/" + $scope.criminaldet[0].cid + "2.jpg";
+                document.getElementById("crimimg3").src = "../static/CriminalImages/" + $scope.criminaldet[0].cid + "3.jpg";
+                document.getElementById("crimid").innerText = $scope.criminaldet[0].cid;
+                document.getElementById("crimname").innerText = $scope.criminaldet[0].cname;
+                document.getElementById("crimadd").innerText = $scope.criminaldet[0].caddress;
+                document.getElementById("crimage").innerText = $scope.criminaldet[0].cage;
+                document.getElementById("crimph").innerText = $scope.criminaldet[0].cphone;
+                var criminal_name = document.getElementById("crimname");
+                var loc = $scope.criminaldet[0].locations;
+
+                function initialize(loca) {
+                    var points = loca;
+                    var infowindow = new google.maps.InfoWindow();
+
+                    function getBoundsZoomLevel(bounds, mapDim) {
+                        var WORLD_DIM = {
+                            height: 256,
+                            width: 256
+                        };
+                        var ZOOM_MAX = 18;
+
+                        function latRad(lat) {
+                            var sin = Math.sin(lat * Math.PI / 180);
+                            var radX2 = Math.log((1 + sin) / (1 - sin)) / 2;
+                            return Math.max(Math.min(radX2, Math.PI), -Math.PI) / 2;
+                        }
+
+                        function zoom(mapPx, worldPx, fraction) {
+                            return Math.floor(Math.log(mapPx / worldPx / fraction) / Math.LN2);
+                        }
+
+                        var ne = bounds.getNorthEast();
+                        var sw = bounds.getSouthWest();
+
+                        var latFraction = (latRad(ne.lat()) - latRad(sw.lat())) / Math.PI;
+
+                        var lngDiff = ne.lng() - sw.lng();
+                        var lngFraction = ((lngDiff < 0) ? (lngDiff + 360) : lngDiff) / 360;
+
+                        var latZoom = zoom(mapDim.height, WORLD_DIM.height, latFraction);
+                        var lngZoom = zoom(mapDim.width, WORLD_DIM.width, lngFraction);
+
+                        return Math.min(latZoom, lngZoom, ZOOM_MAX);
+                    }
+                    var i = 0;
+
+                    function createMarkerForPoint(point) {
+                        i = i + 1;
+                        marker = new google.maps.Marker({
+                            position: new google.maps.LatLng(point.latitude, point.longitude),
+                            label: String(i)
+                        });
+                        google.maps.event.addListener(marker, 'click', (function(marker, i) {
+                            return function() {
+                                infowindow.setContent(point.place);
+                                infowindow.open(map, marker);
+                            }
+                        })(marker, i));
+                        return marker;
+                    }
+
+                    function createBoundsForMarkers(markers) {
+                        var bounds = new google.maps.LatLngBounds();
+                        $.each(markers, function() {
+                            bounds.extend(this.getPosition());
+                        });
+                        return bounds;
+                    }
+
+                    var $mapDiv = $('#map');
+                    var mapDim = {
+                        height: $mapDiv.height(),
+                        width: $mapDiv.width()
+                    }
+
+                    var markers = [];
+                    $.each(points, function() {
+                        markers.push(createMarkerForPoint(this));
+                    });
+                    var bounds = (markers.length > 0) ? createBoundsForMarkers(markers) : null;
+
+                    var map = new google.maps.Map($mapDiv[0], {
+                        center: (bounds) ? bounds.getCenter() : new google.maps.LatLng(0, 0),
+                        mapTypeId: google.maps.MapTypeId.ROADMAP,
+                        zoom: (bounds) ? getBoundsZoomLevel(bounds, mapDim) : 0
+                    });
+
+                    $.each(markers, function() {
+                        this.setMap(map);
+                    });
+                }
+
+                google.maps.event.addDomListener(window, 'load', initialize(loc));
+            });
+        }
+        getCriminalsList();
+    });
+
+    var i = 1;
+
+    function openmaps() {
+        if (i == 1) {
+            document.getElementById("map").style.display = "block";
+            document.getElementById("crimedet").style.display = "none";
+            i = 0;
+        } else {
+            document.getElementById("map").style.display = "none";
+            document.getElementById("crimedet").style.display = "table";
+            i = 1;
+        }
+
+    }
+
+
+    ///////////////////////////Slide Show Transition///////////////
+    // IMAGE SLIDES & CIRCLES ARRAYS, & COUNTER
+    var tim = 3000;
+    var imageSlides = document.getElementsByClassName('imageSlides');
+    var circles = document.getElementsByClassName('circle');
+    var leftArrow = document.getElementById('leftArrow');
+    var rightArrow = document.getElementById('rightArrow');
+    var counter = 0;
+
+    // HIDE ALL IMAGES FUNCTION
+    function hideImages() {
+        for (var i = 0; i < imageSlides.length; i++) {
+            imageSlides[i].classList.remove('visible');
+        }
+    }
+
+    // REMOVE ALL DOTS FUNCTION
+    function removeDots() {
+        for (var i = 0; i < imageSlides.length; i++) {
+            circles[i].classList.remove('dot');
+        }
+    }
+
+    // SINGLE IMAGE LOOP/CIRCLES FUNCTION
+    function imageLoop() {
+        var currentImage = imageSlides[counter];
+        var currentDot = circles[counter];
+        currentImage.classList.add('visible');
+        removeDots();
+        currentDot.classList.add('dot');
+        counter++;
+    }
+
+    // LEFT & RIGHT ARROW FUNCTION & CLICK EVENT LISTENERS
+    function arrowClick(e) {
+        var target = e.target;
+        if (target == leftArrow) {
+            clearInterval(imageSlideshowInterval);
+            hideImages();
+            removeDots();
+            if (counter == 1) {
+                counter = (imageSlides.length - 1);
+                imageLoop();
+                imageSlideshowInterval = setInterval(slideshow, tim);
+            } else {
+                counter--;
+                counter--;
+                imageLoop();
+                imageSlideshowInterval = setInterval(slideshow, tim);
+            }
+        } else if (target == rightArrow) {
+            clearInterval(imageSlideshowInterval);
+            hideImages();
+            removeDots();
+            if (counter == imageSlides.length) {
+                counter = 0;
+                imageLoop();
+                imageSlideshowInterval = setInterval(slideshow, tim);
+            } else {
+                imageLoop();
+                imageSlideshowInterval = setInterval(slideshow, tim);
+            }
+        }
+    }
+
+    leftArrow.addEventListener('click', arrowClick);
+    rightArrow.addEventListener('click', arrowClick);
+
+
+    // IMAGE SLIDE FUNCTION
+    function slideshow() {
+        if (counter < imageSlides.length) {
+            imageLoop();
+        } else {
+            counter = 0;
+            hideImages();
+            imageLoop();
+        }
+    }
+
+    // SHOW FIRST IMAGE, & THEN SET & CALL SLIDE INTERVAL
+    setTimeout(slideshow, 0);
+    var imageSlideshowInterval = setInterval(slideshow, tim);
+
+    ///////////////////////////Slide Show Transition///////////////
+</script>
+
+<style>
+    @font-face {
+        font-family: 'digital';
+        src: url('static/digital-7/digital-7.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    @font-face {
+        font-family: 'venus_rising';
+        src: url('static/venus-rising/venus rising rg.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    @font-face {
+        font-family: 'advancedarch';
+        src: url('static/advanced-architecture/Advanced Architecture.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    @font-face {
+        font-family: 'rational';
+        src: url('static/rational-integer/ratio.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    .main {
+        font-family: 'digital';
+        color: rgb(222, 235, 248);
+        font-size: 2em;
+        background: url('static/UI Template_1.jpg');
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        text-transform: uppercase;
+        text-shadow: 2px 2px 10px rgb(161, 200, 252);
+        font-weight: bold;
+    }
+    /* .rings {
+        background: url("static/ring only.png");
+        opacity: 90%;
+        background-repeat: no-repeat;
+        width: 780px;
+        height: 700px;
+        top: 50px;
+        left: 30px;
+        position: absolute;
+        /* animation: rotation 8s infinite linear; 
+    } */
+    
+    .actual_rings {
+        background-image: url("static/ringonly.png");
+        position: absolute;
+        left: 82px;
+        top: 50px;
+        width: 580px;
+        height: 580px;
+        background-repeat: no-repeat;
+        animation: rotation 15s infinite linear;
+        overflow: -moz-hidden-unscrollable;
+        box-shadow: 3px 3px 30px rgb(161, 200, 252);
+        border-radius: 300px;
+        z-index: 20;
+    }
+    
+    @keyframes rotation {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    
+    #mapsbtn {
+        background: none;
+        border-color: rgb(85, 207, 255);
+        position: absolute;
+        color: rgb(222, 235, 248);
+        text-shadow: 2px 2px 10px rgb(161, 200, 252);
+        width: 120px;
+        height: 60px;
+        font-size: 25px;
+        font-weight: bold;
+        font-family: digital;
+        left: 585px;
+        top: 650px;
+        z-index: 20;
+        box-shadow: 2px 2px 10px rgb(161, 200, 252);
+    }
+    
+    #map {
+        width: 780px;
+        height: 412px;
+        position: absolute;
+        display: none;
+        left: 748px;
+        top: 320px;
+        border: 2px solid rgba(85, 207, 255, 0.822);
+        box-shadow: 2px 2px 20px rgb(161, 200, 252);
+        font-family: Arial, Helvetica, sans-serif;
+        color: black;
+    }
+    
+    #crimname {
+        position: absolute;
+        left: 805px;
+        top: 110px;
+        width: 473px;
+        height: 50px;
+        z-index: 19;
+        font-weight: bold;
+        font-size: 40px;
+        /* text-align: center; */
+    }
+    
+    #crimadd {
+        position: absolute;
+        left: 800px;
+        top: 270px;
+        width: 557px;
+        height: 92px;
+        z-index: 14;
+        font-size: 2vw;
+        /* text-align: center; */
+    }
+    
+    #crimedet {
+        position: absolute;
+        left: 745px;
+        top: 355px;
+        width: 790px;
+        height: 100px;
+        font-size: 25px;
+        z-index: 4;
+        text-align: center;
+        display: table;
+    }
+    
+    #crimedet tr {
+        border-bottom: 1px solid rgb(88, 144, 167);
+    }
+    
+    .scrollit {
+        overflow: scroll;
+    }
+    
+    #crimage {
+        font-size: 40px;
+        font-weight: bold;
+        line-height: 0.6;
+        text-align: center;
+        position: absolute;
+        left: 1270px;
+        top: 116px;
+        z-index: 20;
+    }
+    
+    #crimid {
+        font-size: 40px;
+        font-weight: bold;
+        line-height: 0.6;
+        /* text-align: center; */
+        position: absolute;
+        left: 1370px;
+        top: 116px;
+        z-index: 20;
+    }
+    
+    #crimph {
+        font-size: 35px;
+        font-weight: bold;
+        line-height: 0.6;
+        /* text-align: center; */
+        position: absolute;
+        left: 800px;
+        top: 195px;
+        z-index: 20;
+    }
+    /*|||||||||||||||||||||||| Slide show CSS||||||||||||||||||||||||||| */
+    
+    .slideshowContainer {
+        position: absolute;
+        overflow: hidden;
+        width: 208px;
+        height: 208px;
+        top: 237px;
+        left: 268px;
+    }
+    
+    .imageSlides {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: opacity 1s ease-in-out;
+        width: 208px;
+        height: 208px;
+        border-radius: 150px 150px;
+        top: 50%;
+        left: 50%;
+        z-index: 25;
+    }
+    /* add 'visible' class via Javascript */
+    
+    .visible {
+        opacity: 1;
+    }
+    
+    .slideshowArrow {
+        font-size: 40px;
+        font-weight: bolder;
+        color: rgba(157, 56, 252, 0.938);
+        cursor: pointer;
+        transition: opacity 0.2s ease-in-out;
+        z-index: 30;
+        height: 100px;
+        padding: 20px;
+    }
+    
+    .slideshowArrow:hover {
+        opacity: 0.75;
+    }
+    
+    #leftArrow {
+        position: absolute;
+        left: 4%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    #rightArrow {
+        position: absolute;
+        right: 4%;
+        top: 50%;
+        transform: translate(50%, -50%);
+    }
+    
+    .slideshowCircles {
+        position: absolute;
+        bottom: 2%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 30;
+    }
+    
+    .circle {
+        display: inline-block;
+        margin-left: 1px;
+        margin-right: 1px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        border: solid 2px rgba(167, 167, 167, 0.836);
+        transition: 1s ease-in-out;
+    }
+    
+    .dot {
+        background-color: rgba(0, 225, 255, 0.904);
+        border: solid 1px rgba(42, 168, 252, 0.788);
+    }
+    /*|||||||||||||||||||||||| Slide show CSS||||||||||||||||||||||||||| */
+</style>
+
+</html>

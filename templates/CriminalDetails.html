@@ -1,0 +1,84 @@
+<html>
+
+<head>
+    <title>Criminal Details</title>
+    <script src="../static/angular.min.js"></script>
+</head>
+
+<body class="main">
+    <div class="col-md-12" ng-app="CriminalDet" ng-controller="CriminalDetController">
+        <img id="crimimg" width="200" height="200"><br>
+        <lable>Criminal ID: </lable>
+        <lable id="crimid"></lable><br>
+        <lable>Criminal Name: </lable>
+        <lable id="crimname"></lable><br>
+        <lable>Criminal Address: </lable>
+        <lable id="crimadd"></lable><br>
+
+        <table id="crimedet">
+            <tr class="header">
+                <th style="width:30%;">Crime</th>
+                <th style="width:30%;">Place</th>
+                <th style="width:20%;">Date</th>
+                <th style="width:20%;">Time</th>
+            </tr>
+            {% raw %}
+            <tr ng-repeat="crime in criminaldet1">
+                <td>{{crime.crime}}</td>
+                <td>{{crime.place}}</td>
+                <td>{{crime.date}}</td>
+                <td>{{crime.time}}</td>
+            </tr>
+            {% endraw %}
+        </table>
+        <lable id="test"></lable>
+    </div>
+</body>
+
+<script>
+    var CriminalDet = angular.module("CriminalDet", []);
+    CriminalDet.controller("CriminalDetController", function($scope, $timeout, $rootScope, $window, $http) {
+        function getCriminalsList() {
+            $http({
+                url: '/getCriminalsDetails',
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            }).then(function(data) {
+                $scope.criminaldet = data.data.result;
+                $scope.criminaldet1 = $scope.criminaldet[0].cdetails;
+                document.getElementById("crimimg").src = "../static/CriminalImages/" + $scope.criminaldet[0].cid + ".jpg";
+                document.getElementById("crimid").innerText = $scope.criminaldet[0].cid;
+                document.getElementById("crimname").innerText = $scope.criminaldet[0].cname;
+                document.getElementById("crimadd").innerText = $scope.criminaldet[0].caddress;
+            });
+        }
+        getCriminalsList();
+    });
+</script>
+
+<style>
+    @font-face {
+        font-family: 'digital';
+        src: url('static/digital-7/digital-7.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    @font-face {
+        font-family: 'venus_rising';
+        src: url('static/venus-rising/venus rising rg.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    .main {
+        font-family: 'venus_rising';
+        color: dodgerblue;
+        font-size: 2em;
+        background-color: black;
+    }
+</style>
+
+</html>

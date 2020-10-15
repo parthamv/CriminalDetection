@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="../static/angular.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>Criminals List</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        #myInput {
+            /* background-image: url('static/searchicon.png'); */
+            background-color: rgba(255, 255, 255, 0);
+            background-position: 10px 10px;
+            background-repeat: no-repeat;
+            width: 100%;
+            font-size: 16px;
+            padding: 12px 20px 12px 40px;
+            border: 1px solid rgb(85, 207, 255);
+            margin-bottom: 12px;
+            font-size: 30px;
+            font-weight: bold;
+            color: rgb(85, 207, 255);
+            font-family: 'digital';
+        }
+        
+        input::placeholder {
+            color: rgb(255, 255, 255);
+            font-size: 20px;
+        }
+        
+        #myTable {
+            border-collapse: collapse;
+            width: 100%;
+            border: 1px solid rgb(85, 207, 255);
+            font-size: 18px;
+        }
+        
+        #myTable th,
+        #myTable td {
+            padding: 12px;
+            border-right: 1px solid rgb(85, 207, 255);
+        }
+        
+        #myTable tr {
+            border-bottom: 1px solid rgb(85, 207, 255);
+        }
+        
+        .main {
+            font-family: 'digital';
+            color: rgb(222, 235, 248);
+            font-size: 2em;
+            background: url('static/background.jpg');
+            background-repeat: no-repeat;
+            background-size: 100%;
+            text-transform: uppercase;
+            text-shadow: 2px 2px 10px rgb(161, 200, 252);
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        @font-face {
+            font-family: 'digital';
+            src: url('static/digital-7/digital-7.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        @font-face {
+            font-family: 'venus_rising';
+            src: url('static/venus-rising/venus rising rg.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        @font-face {
+            font-family: 'advancedarch';
+            src: url('static/advanced-architecture/Advanced Architecture.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        @font-face {
+            font-family: 'rational';
+            src: url('static/rational-integer/ratio.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        #criminalname:hover {
+            text-decoration: underline rgb(161, 200, 252);
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="main">
+    <div ng-app="CriminalsUser" ng-controller="CriminalsController">
+        <h2>Criminals List</h2>
+
+        <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search names.." title="Type in a name">
+
+        <table id="myTable">
+            <tr class="header" style="font-size: 30px; font-weight: 100;">
+                <th style="width:30%;">Name</th>
+                <th style="width:30%;">Place</th>
+                <th style="width:20%;">Date</th>
+                <th style="width:20%;">Time</th>
+            </tr>
+            {% raw %}
+            <tr ng-repeat="crim in criminals">
+                <td id="criminalname" ng-click="opencrimdetails(crim.cid)">{{crim.name}}</td>
+                <td>{{crim.place}}</td>
+                <td>{{crim.date}}</td>
+                <td>{{crim.time}}</td>
+            </tr>
+            {% endraw %}
+        </table>
+    </div>
+</body>
+
+</html>
+
+<script>
+    var CriminalsUser = angular.module("CriminalsUser", []);
+    CriminalsUser.controller("CriminalsController", function($scope, $timeout, $rootScope, $window, $http) {
+        function getCriminalsList() {
+            $http({
+                url: '/getCriminalsList',
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            }).then(function(data) {
+                $scope.criminals = data.data.result;
+            });
+        }
+        getCriminalsList();
+
+        $scope.opencrimdetails = function opencrimdetails(cid) {
+            $http({
+                url: '/crimdetailsfromlist',
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                data: {
+                    "crimid": cid
+                }
+            }).then(function(data) {
+                $scope.message = data.data.result;
+                // console.log(data.data.result)
+            });
+        }
+    });
+
+    function myFunction() {
+        var input, filter, table, tr, td, i, txtValue;
+        input = document.getElementById("myInput");
+        filter = input.value.toUpperCase();
+        table = document.getElementById("myTable");
+        tr = table.getElementsByTagName("tr");
+        for (i = 0; i < tr.length; i++) {
+            td = tr[i].getElementsByTagName("td")[0];
+            if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    }
+</script>
